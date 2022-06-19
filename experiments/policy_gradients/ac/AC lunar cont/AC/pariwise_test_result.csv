@@ -1,0 +1,4 @@
+,Contrast,A,B,Paired,Parametric,U-val,alternative,p-unc,hedges
+0,model,AC before,AC eval,False,False,721.0,two-sided,1.4041446664279404e-25,-1.982499396774111
+1,model,AC before,dummy,False,False,4473.0,two-sided,0.1982880639673713,-0.14862560870742947
+2,model,AC eval,dummy,False,False,9127.0,two-sided,6.592759803260593e-24,1.7495238860017743

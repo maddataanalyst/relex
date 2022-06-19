@@ -1,0 +1,4 @@
+,Contrast,A,B,Paired,Parametric,U-val,alternative,p-unc,hedges
+0,model,ppo_eval,random_eval,False,False,9136.0,two-sided,0.0,2.0049
+1,model,ppo_eval,strategy_eval,False,False,10000.0,two-sided,0.0,5.6807
+2,model,random_eval,strategy_eval,False,False,6134.0,two-sided,0.0056,0.6137

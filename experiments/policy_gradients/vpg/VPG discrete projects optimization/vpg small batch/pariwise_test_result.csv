@@ -1,0 +1,7 @@
+,Contrast,A,B,Paired,Parametric,U-val,alternative,p-unc,hedges
+0,model,Optimization agent,agent before,False,False,10000.0,two-sided,2.532722361953075e-34,8.19407543424429
+1,model,Optimization agent,agent eval,False,False,9970.0,two-sided,6.293583844164808e-34,3.649065024677334
+2,model,Optimization agent,dummy,False,False,10000.0,two-sided,2.439253480671014e-34,8.208801590557698
+3,model,agent before,agent eval,False,False,0.0,two-sided,2.532722361953075e-34,-5.743842503418146
+4,model,agent before,dummy,False,False,6081.0,two-sided,0.008225961527029074,0.44988922776837237
+5,model,agent eval,dummy,False,False,10000.0,two-sided,2.439253480671014e-34,5.76422694713775

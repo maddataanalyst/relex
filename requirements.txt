@@ -1,0 +1,16 @@
+# local package
+-e .
+
+gym
+numpy
+pandas
+tensorflow
+scipy
+tabulate
+tqdm
+pytest
+matplotlib
+seaborn
+pingouin
+pygame
+tensorflow_probability
