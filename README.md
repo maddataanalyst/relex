@@ -48,6 +48,8 @@ Policy gradient algorithms:
 - [x] PPO
 - [x] AC
 - [x] VPG
+
+Hybrid algorithms:
 - [x] SAC
 
 Q-learning algorithms:

@@ -1,0 +1,4 @@
+,Contrast,A,B,Paired,Parametric,U-val,alternative,p-unc,hedges
+0,model,Agent before,Agent eval,False,False,7043.0,two-sided,6.01852349676629e-07,0.7292036726030585
+1,model,Agent before,dummy,False,False,5406.0,two-sided,0.321786085060103,0.21890907393612652
+2,model,Agent eval,dummy,False,False,3822.0,two-sided,0.004013605771709069,-0.3939969525642036

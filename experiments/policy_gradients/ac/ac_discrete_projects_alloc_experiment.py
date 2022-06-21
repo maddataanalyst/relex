@@ -76,7 +76,7 @@ if __name__ == "__main__":
         consts.VALUE_ARCH: value_arch
     }
     agent_learning_params = {
-        consts.NEPISODES: 500,
+        consts.NEPISODES: 100,
         consts.PRINT_INTERVAL: 1,
         consts.LAMBDA: 0.95,
         consts.GAMMA: 0.99,
