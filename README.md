@@ -20,7 +20,9 @@ For example, PPO implementation, or AC in theory, is embarrassingly parallel (mu
 
 ## Papers
 
-1. Policy gradient:
+1. Value-based algorithms:
+   1. DQN: [Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A. A., Veness, J., Bellemare, M. G., ... & Hassabis, D. (2015). Human-level control through deep reinforcement learning. _nature_, _518_(7540), 529-533.](https://daiwk.github.io/assets/dqn.pdf)
+2. Policy gradient:
    1. PPO
       1. [Schulman, J., Wolski, F., Dhariwal, P., Radford, A., & Klimov, O. (2017). Proximal policy optimization algorithms. arXiv preprint arXiv:1707.06347.](https://arxiv.org/pdf/1707.06347.pdf)
       2. [Schulman, J., Moritz, P., Levine, S., Jordan, M., & Abbeel, P. (2015). High-dimensional continuous control using generalized advantage estimation. arXiv preprint arXiv:1506.02438.](https://arxiv.org/abs/1506.02438)
@@ -52,7 +54,7 @@ Policy gradient algorithms:
 Hybrid algorithms:
 - [x] SAC
 
-Q-learning algorithms:
+Value-based algorithms:
 - [x] DQN (vanilla)
 - [ ] DDQN
 - [ ] Dueling DQN
