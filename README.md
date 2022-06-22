@@ -53,7 +53,7 @@ Hybrid algorithms:
 - [x] SAC
 
 Q-learning algorithms:
-- [ ] DQN
+- [x] DQN (vanilla)
 - [ ] DDQN
 - [ ] Dueling DQN
 
