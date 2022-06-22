@@ -26,10 +26,10 @@ class SAC(rl_commons.RLAgent):
 
     def __init__(self,
                  actor: policy_nets.BasePolicyNet,
-                 critic1: q_nets.QNet,
-                 critic2: q_nets.QNet,
-                 target_critic1: q_nets.QNet,
-                 target_critic2: q_nets.QNet,
+                 critic1: q_nets.QSANet,
+                 critic2: q_nets.QSANet,
+                 target_critic1: q_nets.QSANet,
+                 target_critic2: q_nets.QSANet,
                  actor_opt: krs.optimizers.Optimizer,
                  crtitic_opt: krs.optimizers.Optimizer,
                  buffer: mbuff.SimpleMemory,
@@ -173,7 +173,7 @@ class SAC(rl_commons.RLAgent):
         return td_target
 
     def optimize_critic(self,
-                        critic: q_nets.QNet,
+                        critic: q_nets.QSANet,
                         states: np.array,
                         actions: np.array,
                         td_targets: np.array,

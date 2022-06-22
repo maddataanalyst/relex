@@ -1,0 +1,7 @@
+,Contrast,A,B,Paired,Parametric,U-val,alternative,p-unc,hedges
+0,model,DQN before,DQN eval,False,False,300.0,two-sided,1.2268736106420763e-34,-5.203433700628062
+1,model,DQN before,Optimization agent,False,False,0.0,two-sided,5.6400152103706336e-39,-8.025448641716713
+2,model,DQN before,dummy,False,False,9300.0,two-sided,5.618162976221404e-31,1.406634690799838
+3,model,DQN eval,Optimization agent,False,False,401.0,two-sided,2.7163754422730475e-29,-2.2019496941075385
+4,model,DQN eval,dummy,False,False,9938.0,two-sided,1.5538281739376832e-33,5.341250768940551
+5,model,Optimization agent,dummy,False,False,10000.0,two-sided,2.4367781977321144e-34,7.969145914128059

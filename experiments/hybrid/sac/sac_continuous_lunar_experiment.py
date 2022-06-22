@@ -35,11 +35,11 @@ if __name__ == "__main__":
     critic_arch_s_sizes = [128, 64]
     critic_h_act = 'relu'
     critic_out_act = 'linear'
-    critic1 = q_nets.QNet(s_dim, a_dim, critic_arch_shared, critic_arch_a_sizes, critic_arch_s_sizes, h_act=critic_h_act, out_act=critic_out_act)
-    critic2 = q_nets.QNet(s_dim, a_dim, critic_arch_shared, critic_arch_a_sizes, critic_arch_s_sizes, h_act=critic_h_act, out_act=critic_out_act)
+    critic1 = q_nets.QSANet(s_dim, a_dim, critic_arch_shared, critic_arch_a_sizes, critic_arch_s_sizes, h_act=critic_h_act, out_act=critic_out_act)
+    critic2 = q_nets.QSANet(s_dim, a_dim, critic_arch_shared, critic_arch_a_sizes, critic_arch_s_sizes, h_act=critic_h_act, out_act=critic_out_act)
 
-    target_critic1 = q_nets.QNet(s_dim, a_dim, critic_arch_shared, critic_arch_a_sizes, critic_arch_s_sizes, h_act=critic_h_act, out_act=critic_out_act)
-    target_critic2 = q_nets.QNet(s_dim, a_dim, critic_arch_shared, critic_arch_a_sizes, critic_arch_s_sizes, h_act=critic_h_act, out_act=critic_out_act)
+    target_critic1 = q_nets.QSANet(s_dim, a_dim, critic_arch_shared, critic_arch_a_sizes, critic_arch_s_sizes, h_act=critic_h_act, out_act=critic_out_act)
+    target_critic2 = q_nets.QSANet(s_dim, a_dim, critic_arch_shared, critic_arch_a_sizes, critic_arch_s_sizes, h_act=critic_h_act, out_act=critic_out_act)
 
     lr_policy = 0.0001
     lr_value = 0.005

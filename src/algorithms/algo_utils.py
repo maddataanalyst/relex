@@ -11,6 +11,10 @@ from tqdm.auto import tqdm
 
 import src.algorithms.commons as rl_commons
 
+NANS_EPISLON = "NaNs in epsilons check params"
+
+TOO_FEW_EPISODES_MSG = "Cannot allocate decayed espilons. Try to increase number of episodes or increase decay rate"
+
 
 def normalize_state(s: np.ndarray, scaler: object = None) -> np.array:
     """
@@ -138,3 +142,40 @@ def evaluate_algorithm(model: rl_commons.RLAgent, env: gym.Env, n_episodes: int,
             s = sprime
         scores.append(ep_score)
     return np.array(scores)
+
+
+def decay_schedule_epsilon(initial_value: float, min_value: float, decay_ratio: float, max_steps: int, log_start: int=-2, log_base: int = 10) -> np.array:
+    """
+    Builds a decayed epsilon values, according to some decay factor.
+    Parameters
+    ----------
+    initial_value: float
+        Initial epsilon value
+    min_value: float
+        Minimal epsilon value
+    decay_ratio: float
+        Decay rate
+    max_steps: int
+        Maximum number of steps for decay. Should be equal to THE NUMBER OF EPIDES.
+    log_start: float
+        Initial value for the logarithm.
+    log_base: float
+        Logarithm base
+
+    Returns
+    -------
+    np.array
+        An array of decayed epsilon.
+    """
+    n_steps = int(max_steps * decay_ratio)
+    if n_steps == 0:
+        raise ValueError(TOO_FEW_EPISODES_MSG)
+    rem_steps = max_steps - n_steps
+    values = np.logspace(log_start, 0, n_steps,
+                         base=log_base, endpoint=True)[::-1]
+    values = (values - values.min()) / (values.max() - values.min())
+    values = (initial_value - min_value) * values + min_value
+    values = np.pad(values, (0, rem_steps), 'edge')
+    if np.isnan(values).any():
+        raise ValueError(NANS_EPISLON)
+    return values

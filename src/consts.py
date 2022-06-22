@@ -44,6 +44,13 @@ CRITIC_S_SZ = 'critis_s_size'
 CRITIC_OPT = 'critic_opt'
 WARMUP_BATCHES = 'warmup_batches'
 
+EPSILON = 'epsilon'
+
+Q_NET_ARCH = 'q_net_arch'
+HIDDEN_ACT_F = 'hidden_activation_function'
+OUTOUT_ACT_F = 'output_activation_function'
+BATCH_NORM = 'batch_norm'
+
 # Experiment consts
 MODEL_COL = 'model'
 SCORE_COL = 'score'

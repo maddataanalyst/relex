@@ -183,7 +183,7 @@ class RLAgent:
         """
         raise NotImplementedError("Implement me")
 
-    def make_step(self, s: np.array, env: gym.wrappers.TimeLimit, clip_action: bool, scaler: object) -> Tuple[np.array, float, bool, float, np.array]:
+    def make_step(self, s: np.array, env: gym.wrappers.TimeLimit, clip_action: bool, scaler: object, *args, **kwargs) -> Tuple[np.array, float, bool, float, np.array]:
         """
         Performs a single transition step.
 
@@ -209,7 +209,7 @@ class RLAgent:
         """
         import src.algorithms.algo_utils as autils
 
-        a, a_logprob = self.choose_action(s)
+        a, a_logprob = self.choose_action(s, *args, **kwargs)
         a_clip = self.action_clipper.clip_action(a, env) if clip_action else a
         sprime, r, done, _ = env.step(np.atleast_1d(a_clip)) if env.action_space.shape != () else env.step(a_clip)
         sprime = np.atleast_1d(autils.normalize_state(sprime, scaler))

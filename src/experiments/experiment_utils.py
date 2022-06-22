@@ -48,7 +48,8 @@ def conduct_experiment(
         logger: logging.Logger = utils.prepare_default_log(),
         overall_comparison_test: Callable = pg.kruskal,
         pairwise_comparison_test: Callable = pg.pairwise_ttests,
-        pairwise_parametric: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        pairwise_parametric: bool = False,
+        scaler: object = None) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Generic function for conducting RL experiments using Relex agents and gym or custom envs.
     Should fit with most agent/env combinations.
@@ -83,6 +84,8 @@ def conduct_experiment(
         Pairwise test to condut. Default to pingouin pairwiste ttests.
     pairwise_parametric: bool
         Should pairwise test be parametric? Default to false.
+    scaler: object
+        Scaler to adjust states.
     Returns
     -------
     Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
@@ -105,23 +108,23 @@ def conduct_experiment(
         _log_mlflow_params(agent_hyperparams_to_log)
 
         agent_scores_before = autil.evaluate_algorithm(agent, env, n_episodes=eval_episodes, max_ep_steps=max_ep_steps,
-                                                       clip_action=clip_actions)
+                                                       clip_action=clip_actions, scaler=scaler)
         log_scores(agent.name, 'before train', agent_scores_before, logger)
 
         benchmark_scores_by_name = {}
         for benchmark_agent in benchmark_agents:
             benchmark_agent_score = autil.evaluate_algorithm(benchmark_agent, env, n_episodes=eval_episodes,
                                                              max_ep_steps=max_ep_steps,
-                                                             clip_action=clip_actions)
+                                                             clip_action=clip_actions, scaler=scaler)
             log_scores(benchmark_agent.name, 'benchmark', benchmark_agent_score, logger)
             benchmark_scores_by_name[benchmark_agent.name] = benchmark_agent_score
 
-        training_scores = agent.train(env, max_steps=max_ep_steps, clip_action=clip_actions, log=logger,
+        training_scores = agent.train(env, max_steps=max_ep_steps, clip_action=clip_actions, log=logger, scaler=scaler,
                                       **agent_learning_params)
         log_scores("agent", "training scores", training_scores, logger)
 
         agent_eval = autil.evaluate_algorithm(agent, env, n_episodes=eval_episodes, max_ep_steps=max_ep_steps,
-                                              clip_action=clip_actions)
+                                              clip_action=clip_actions, scaler=scaler)
         log_scores(agent.name, "eval", agent_eval, logger)
 
         scores_df = pd.DataFrame({
