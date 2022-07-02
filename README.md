@@ -94,3 +94,16 @@ This project is structured according to the Data Science Cookiecutter schema. Be
    2. **notebooks/** - also include experiments, sometimes half-done, not working, or in progress, in the form of notebooks.
 
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
+
+# Publications
+
+Below you can find publications utilizing Relex library.
+
+Below you can find publications utilizing Relex. The list will be gradually updated as I develop both - the library and write new papers (which can take a looooot of time, sometimes a year, before a review). 
+
+I will be glad, if you could cite the papers in your own work if you use Relex somewhere.
+
+
+| **Paper** | **Status**                  |
+|-----------|-----------------------------|
+|Wójcik, F. (2022). *Utilization of deep reinforcement learning for discrete resource allocation problem in project management - a simulation experiment*. Informatyka Ekonomiczna=Business Informatics. | In review (as of July 2022) |
