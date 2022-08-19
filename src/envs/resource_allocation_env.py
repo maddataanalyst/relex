@@ -1,5 +1,6 @@
 from random import sample
 
+import cvxpy as cp
 import pandas as pd
 import numpy as np
 import gym
@@ -11,12 +12,18 @@ import src.algorithms.commons as acommons
 
 from tensorflow_probability.python.distributions import TruncatedNormal
 from tensorflow_probability.python.distributions import Distribution
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 ACTION_PROJ_1 = 0
 ACTION_PROJ_2 = 1
 ACTION_RESERVE = 2
 ACTION_DISMISS = 3
+ACITON_INCREASE = 4
+
+NORMALIZE_FROM_TANH = 'tanh'
+NORMALIZE_FROM_SOFTMAX = 'softmax'
+
+NORMALIZATION_METHODS = [NORMALIZE_FROM_SOFTMAX, NORMALIZE_FROM_TANH, None]
 
 """
 This module contains the resource allocation environment that was used for experiments. 
@@ -68,18 +75,20 @@ def create_projects(max_resource: int = 100, max_payout: float = 1000, stochasti
     return pd.DataFrame.from_dict(data)
 
 
-class SimpleProjectsEnv(gym.Env):
+class NumericalAllocProjectsEnv(gym.Env):
     """
     Generalized implementation of projects env. It uses the proportional allocation of resources.
     It's a base class for later implementations (e.g., discrete projects allocation env).
     """
     ACTION_DISMISS = 2
+    ACTION_INCREASE = 3
 
     def __init__(
             self,
             start_resource: int = 100,
             start_cash: float = 1000,
-            upkeep_cost=-10,
+            upkeep_cost: int = -10,
+            increase_resource_cost: float = -15,
             min_payout: float = -100,
             max_payout: float = 100.,
             payout_mean: float = 0.0,
@@ -88,9 +97,9 @@ class SimpleProjectsEnv(gym.Env):
             max_balance: float = 50000,
             stochastic: bool = False,
             seed: int = 123,
-            balance_is_reward: float = False,
+            pnl_is_reward: float = False,
             projects: pd.DataFrame = None,
-            normalize_from: str = 'tanh',
+            normalize_from: Optional[str] = NORMALIZE_FROM_TANH,
             distrib: Distribution = TruncatedNormal(0.5, 0.2, 0.0, 1.0)):
         """
         Initializes project environment simulator.
@@ -103,6 +112,8 @@ class SimpleProjectsEnv(gym.Env):
             Initial cash resources.
         upkeep_cost: float
             Upkeep cost of idle resources.
+        increase_resource_cost: float
+            Cost of increasing number of resources, paid for each resource.
         min_payout: int
             Minimal payout per project.
         max_payout: int
@@ -119,8 +130,8 @@ class SimpleProjectsEnv(gym.Env):
             Is env stochastic. If not then P(success) = 1 for each project.
         seed: int
             Random seed.
-        balance_is_reward: bool
-            Is balance a reward signal for an agent? If not - single payouts are used as rewards.
+        pnl_is_reward: bool
+            Should PnL be returned as reward? If not - single payouts are used as rewards.
         projects: pd.DataFrame
             Predefined projects data frame if needed.
         normalize_from: str
@@ -129,12 +140,12 @@ class SimpleProjectsEnv(gym.Env):
         distrib: Distribution
             A distribution to be used for building projects probability.
         """
-        super(SimpleProjectsEnv, self).__init__()
-
+        super(NumericalAllocProjectsEnv, self).__init__()
+        self.increase_resource_cost = increase_resource_cost
         self.payout_mean = payout_mean
         self.payout_std = payout_std
         self.distrib = distrib
-        if (normalize_from != 'tanh') and (normalize_from != 'logits'):
+        if not (normalize_from in NORMALIZATION_METHODS):
             raise ValueError("Invalid normalization")
         self.normalize_from = normalize_from
         self.stochastic = stochastic
@@ -145,7 +156,7 @@ class SimpleProjectsEnv(gym.Env):
 
         self.size = size
         self.max_balance = max_balance
-        self.balance_is_reward = balance_is_reward
+        self.pnl_is_reward = pnl_is_reward
 
         if projects is None:
             self._build_projects(max_payout, min_payout, size, start_resource, stochastic, payout_mean, payout_std,
@@ -193,15 +204,14 @@ class SimpleProjectsEnv(gym.Env):
 
     def _build_action_space(self) -> spaces.Box:
         """
-        Builds an action space. In case of proportional allocation, it uses three possible actions:
-        [%] allocation to proj. A, proj. B, resources kept idle.
+        Builds an action space. For each possible project: [%] of available resources to allocate.
 
         Returns
         -------
         spaces.Box
             Box space with predefined actions.
         """
-        return spaces.Box(low=np.array([0., 0., 0.]), high=np.array([1., 1., 1.]))
+        return spaces.Box(low=np.array([0., 0., 0., 0.]), high=np.array([1., 1., 1., 1.]))
 
     def _build_projects(self,
                         max_payout: int,
@@ -270,7 +280,7 @@ class SimpleProjectsEnv(gym.Env):
         done = self.current_balance <= 0.0 or self.current_resources <= 0
         if self.current_step == (self.size - 1):
             done = True
-        reward = self.current_balance if self.balance_is_reward else action_val
+        reward = action_val
         return obs, reward, done, {}
 
     def _next_observation(self) -> np.array:
@@ -311,36 +321,50 @@ class SimpleProjectsEnv(gym.Env):
             Action value, value of the step taken - reward obtained from action. E.g. project payout, or penalty for
             an idle resources.
         """
-        alloc = None
-        if self.normalize_from == 'tanh':
+        if self.normalize_from == NORMALIZE_FROM_TANH:
             alloc = (a - (-1)) / 2.
-        else:
+        elif self.normalize_from == NORMALIZE_FROM_SOFTMAX:
             alloc = tf.nn.softmax(a).numpy().squeeze()
+        else:
+            alloc = a
         alloc = (alloc * self.current_resources).astype(int)
-        reserve = 0.
-        if alloc[ACTION_PROJ_1] > self.current_proj.proj_1_alloc:
-            diff = alloc[ACTION_PROJ_1] - self.current_proj.proj_1_alloc
-            reserve += diff
-            alloc[ACTION_PROJ_1] = self.current_proj.proj_1_alloc
 
-        if alloc[ACTION_PROJ_2] > self.current_proj.proj_2_alloc:
-            diff = alloc[ACTION_PROJ_2] - self.current_proj.proj_2_alloc
-            reserve += diff
-            alloc[ACTION_PROJ_2] = self.current_proj.proj_2_alloc
+        alloc = np.clip(alloc, 0, np.array(
+            [self.current_proj.proj_1_alloc, self.current_proj.proj_2_alloc, self.current_resources,
+             self.current_resources]))
+
+        proj_12_allocated = alloc[0] + alloc[1]
+        reserve = self.current_resources - proj_12_allocated
+
+        dismiss = alloc[self.ACTION_DISMISS]
+        reserve = max(0, reserve - dismiss)
+
+        self.current_resources -= alloc[self.ACTION_DISMISS]
 
         proj_1_success = np.random.binomial(1, self.current_proj.proj_1_proba) if self.stochastic else 1.
         proj_2_success = np.random.binomial(1, self.current_proj.proj_2_proba) if self.stochastic else 1.
         proj_payout = (alloc[ACTION_PROJ_1] * self.current_proj.proj_1_payouts * proj_1_success) + (alloc[
                                                                                                         ACTION_PROJ_2] * self.current_proj.proj_2_payouts * proj_2_success)
-        res_costs = reserve * self.upkeep_cost
-        action_value = proj_payout + res_costs
+        reserve_costs = reserve * self.upkeep_cost
+        action_value = proj_payout + reserve_costs
+
+        num_resources_to_increase = alloc[self.ACTION_INCREASE]
+        increase_cost = num_resources_to_increase * self.increase_resource_cost
+        feasible_increase_cost = -1 * np.clip(-1 * increase_cost, 0, self.current_balance)
+        feasible_increase_size = int(feasible_increase_cost // self.increase_resource_cost)
+        self.current_resources += feasible_increase_size
+        action_value += feasible_increase_cost
+
         self.current_balance += action_value
         self.current_balance = np.clip(self.current_balance, -1 * self.max_balance, self.max_balance)
-        self.current_resources -= alloc[self.ACTION_DISMISS]
-        return action_value
+
+        profit_and_loss = self.current_balance - self.start_cash
+        reward = profit_and_loss if self.pnl_is_reward else action_value
+
+        return reward
 
 
-class DiscreteProjectsEnv(SimpleProjectsEnv):
+class DiscreteProjectsEnv(NumericalAllocProjectsEnv):
     """
     It is a discretized version of the project allocation env - where actions are discrete instead
     of continuous ([%] allocation). The remaining logic is the same as before.
@@ -368,14 +392,13 @@ class DiscreteProjectsEnv(SimpleProjectsEnv):
             max_balance: float = 50000,
             stochastic: bool = False,
             seed: int = 123,
-            balance_is_reward: float = False,
+            pnl_is_reward: float = False,
             projects: pd.DataFrame = None,
             increase_resource_cost: float = -20,
             normalize_from: str = 'tanh',
             distrib_prob: TruncatedNormal = TruncatedNormal(0.5, 0.2, 0.0, 1.0)):
-        super().__init__(start_resource, start_cash, upkeep_cost, min_payout, max_payout, payout_mean, payout_std, size,
-                         max_balance, stochastic, seed, balance_is_reward, projects, normalize_from, distrib_prob)
-        self.increase_resource_cost = increase_resource_cost
+        super().__init__(start_resource, start_cash, upkeep_cost, increase_resource_cost, min_payout, max_payout, payout_mean, payout_std, size,
+                         max_balance, stochastic, seed, pnl_is_reward, projects, normalize_from, distrib_prob)
 
     def _build_action_space(self):
         return spaces.Discrete(9)
@@ -453,8 +476,9 @@ class DiscreteProjectsEnv(SimpleProjectsEnv):
         action_value = score + cost
         self.current_balance += action_value
         self.current_balance = np.clip(self.current_balance, -1 * self.max_balance, self.max_balance)
-
-        return action_value
+        profit_and_loss = self.current_balance - self.start_cash
+        reward = profit_and_loss if self.pnl_is_reward else action_value
+        return reward
 
     def _calculate_size_increase(self, ratio: float) -> Tuple[float, int]:
         """
@@ -484,34 +508,36 @@ class DiscreteProjectsEnv(SimpleProjectsEnv):
 
 class OptimizerAgent(dummy.DummyAgent):
 
-    def __init__(self, env: gym.Env):
+    def __init__(self, env: NumericalAllocProjectsEnv):
         super().__init__(env)
+        self.projects_env = env
 
     def choose_action(self, s: np.array, *args, **kwargs) -> Tuple[np.array, np.array]:
-        probas = np.array([s[2], s[5]])
-        rewards = np.array([s[1], s[4]])
-        allocs = np.array([s[0], s[3]])
-        expected_rewards = allocs * rewards * probas
-
+        s = s.squeeze()
+        probas = np.array([s[2], s[5], 1.])
+        rewards = np.array([s[1], s[4], self.projects_env.upkeep_cost])
+        resource_bounds = np.array([s[0], s[3]])
         resources = s[-2]
-        expected_vals = probas * expected_rewards
 
-        bounds = [(0, 1.), (0., 1.)]
-        A_ub = np.array([
-            [resources, 0.],
-            [0., resources],
-            [resources, resources]
-        ])
-        b_ub = np.array([
-            np.min([allocs[0], resources]),
-            np.min([allocs[1], resources]),
-            resources
-        ])
-        sol = opt.linprog(-1 * expected_rewards * resources, A_ub=A_ub, b_ub=b_ub)
-        perc_alloc = np.array(list(sol.x.round(2)) + [0.])
-        alloc_scaled_m1_to_1 = (perc_alloc * 2.) - 1.
+        alloc = cp.Variable(probas.shape[0], integer=True)
 
-        return alloc_scaled_m1_to_1, None
+        problem = cp.Problem(cp.Minimize(
+            cp.multiply(probas, alloc) @ cp.multiply(-1, rewards)),
+            [
+                alloc >= 0,
+                cp.sum(alloc) <= resources,
+                alloc[0] <= resource_bounds[0],
+                alloc[1] <= resource_bounds[1],
+                alloc[2] <= resources
+            ])
+        problem.solve()
+
+        # Append 0 for "free resources" action that will never be chose by this agent
+        alloc_count = np.round(alloc.value, 3)
+        alloc_percent = list(alloc_count / float(resources))
+        solution = [alloc_percent[0], alloc_percent[1], 0., 0.]
+
+        return np.array(solution), None
 
 
 class DiscreteProjectOptimizerAgent(dummy.DummyAgent):

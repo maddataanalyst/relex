@@ -32,7 +32,7 @@ if __name__ == "__main__":
         payout_mean=1.0,
         payout_std=0.5,
         size=ENV_SIZE,
-        balance_is_reward=False,
+        pnl_is_reward=False,
         stochastic=True)
 
     s_dim = env.observation_space.shape[0]

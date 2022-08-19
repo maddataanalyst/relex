@@ -96,7 +96,7 @@ def log_progress(
 
 
 def evaluate_algorithm(model: rl_commons.RLAgent, env: gym.Env, n_episodes: int, max_ep_steps: int = 1000,
-                       clip_action: bool = True, scaler: object = None) -> np.array:
+                       clip_action: bool = True, scaler: object = None, last_reward_only: bool = False) -> np.array:
     """
     Evaluates an agent against an environment and collects scores along the way.
 
@@ -120,6 +120,10 @@ def evaluate_algorithm(model: rl_commons.RLAgent, env: gym.Env, n_episodes: int,
     scaler: object
         A scaler object to be used.
 
+    last_reward_only: bool
+        Should only last reward in episode be returned? Useful in env when the final reward is some sort of summary
+        e.g. profit & loss.
+
     Returns
     -------
     np.array
@@ -140,7 +144,10 @@ def evaluate_algorithm(model: rl_commons.RLAgent, env: gym.Env, n_episodes: int,
             sprime, r, done, _ = env.step(np.atleast_1d(a_clip)) if env.action_space.shape != () else env.step(a_clip)
             ep_score += r
             s = sprime
-        scores.append(ep_score)
+        if last_reward_only:
+            scores.append(r)
+        else:
+            scores.append(ep_score)
     return np.array(scores)
 
 
