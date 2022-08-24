@@ -1,8 +1,15 @@
 import tensorflow as tf
-import tensorflow.keras as krs
 import numpy as np
 
+krs = tf.keras
+
+from enum import Enum
 from typing import List, Tuple
+
+
+class AdvantageNorm(Enum):
+    MAX = 0
+    MEAN = 1
 
 
 def polyak_tau_update_networks(target_net: krs.models.Model, online_net: krs.models.Model, polyak_tau: float = 0.005):
@@ -48,6 +55,7 @@ class QNet:
     ):
         self.state_dim = state_dim
         self.action_dim = action_dim
+        self.h_sizes = h_sizes
         self._build_net(h_sizes, h_act, out_act, h_initializer, out_initializer, batch_norm)
 
     def _build_net(self, h_sizes: List[int], h_act: str, out_act: str, h_initializer: krs.initializers.Initializer,
@@ -83,7 +91,8 @@ class QNet:
         else:
             for l_idx, h_size in enumerate(h_sizes):
                 if l_idx == 0:
-                    model.add(krs.layers.Dense(h_size, kernel_initializer=h_initializer, activation=h_act, input_dim=self.state_dim))
+                    model.add(krs.layers.Dense(h_size, kernel_initializer=h_initializer, activation=h_act,
+                                               input_dim=self.state_dim))
                 else:
                     model.add(krs.layers.Dense(h_size, kernel_initializer=h_initializer, activation=h_act))
         model.add(krs.layers.Dense(units=self.action_dim, activation=out_act, kernel_initializer=out_initializer))
@@ -190,4 +199,119 @@ class QSANet:
             State values (N,)
         """
         q_val = self.net([s, a], *args, **kwargs)
-        return q_val  # tf.squeeze(q_val)
+        return q_val
+
+
+class DuelingNetModel(krs.Model):
+
+    def __init__(self, state_dim: int,
+                 action_dim: int,
+                 h_sizes: List[int],
+                 h_act: str = 'relu',
+                 out_act: str = 'linear',
+                 h_initializer: krs.initializers.Initializer = krs.initializers.HeNormal(),
+                 out_initializer: krs.initializers.Initializer = krs.initializers.HeNormal(),
+                 batch_norm: bool = False,
+                 advantage_norm: AdvantageNorm = AdvantageNorm.MEAN):
+        super().__init__()
+        self.advantage_norm = advantage_norm
+        if batch_norm:
+            self.batch_norm_l = krs.layers.BatchNormalization()
+        self.batch_norm = batch_norm
+        self.hidden_layers = [krs.layers.Dense(h_size, kernel_initializer=h_initializer, activation=h_act) for h_size in
+                              h_sizes]
+        self.v_layer = krs.layers.Dense(units=1, activation=out_act, kernel_initializer=out_initializer)
+        self.adv_layer = krs.layers.Dense(units=action_dim, activation=out_act, kernel_initializer=out_initializer)
+
+    def call(self, input_data):
+        out1 = input_data
+        if self.batch_norm:
+            out1 = self.batch_norm_l(input_data)
+
+        hidden_out = out1
+        for layer in self.hidden_layers:
+            hidden_out = layer(hidden_out)
+
+        v_s = self.v_layer(hidden_out)
+        adv_raw = self.adv_layer(hidden_out)
+
+        adv_norm = self._normalize_advantage(adv_raw)
+
+        q_sa = v_s + (adv_raw - adv_norm)
+        return q_sa
+
+    def _normalize_advantage(self, adv_raw):
+        if self.advantage_norm == AdvantageNorm.MEAN:
+            adv_norm = tf.math.reduce_mean(adv_raw, axis=1, keepdims=True)
+
+        elif self.advantage_norm == AdvantageNorm.MAX:
+            adv_norm = tf.math.reduce_max(adv_raw, axis=1, keepdims=True)
+        return adv_norm
+
+    def advantage(self, state: tf.Tensor):
+        out1 = state
+        if self.batch_norm:
+            out1 = self.batch_norm_l(state)
+
+        hidden_out = out1
+        for layer in self.hidden_layers:
+            hidden_out = layer(hidden_out)
+
+        adv_raw = self.adv_layer(hidden_out)
+        return adv_raw
+
+
+class DuelingQNet(QNet):
+
+    def __init__(
+            self,
+            state_dim: int,
+            action_dim: int,
+            h_sizes: List[int],
+            h_act: str = 'relu',
+            out_act: str = 'linear',
+            h_initializer: krs.initializers.Initializer = krs.initializers.HeNormal(),
+            out_initializer: krs.initializers.Initializer = krs.initializers.HeNormal(),
+            batch_norm: bool = False,
+            advantage_norm: AdvantageNorm = AdvantageNorm.MEAN
+    ):
+        self.advantage_norm = advantage_norm
+        self.action_dim = action_dim
+        super().__init__(state_dim, action_dim, h_sizes, h_act, out_act, h_initializer, out_initializer, batch_norm)
+
+
+    def _build_net(self, h_sizes: List[int], h_act: str, out_act: str, h_initializer: krs.initializers.Initializer,
+                   out_initializer: krs.initializers.Initializer, batch_norm: bool = False) -> krs.Model:
+        """
+        Prepares an internal network structure for dueling netwrok - outputs V(s) and Q(s,a).
+
+        Parameters
+        ----------
+        h_sizes: List[int]
+            List of hidden layer sizes.
+
+        h_act: str
+            Hidden layer activations.
+
+        out_act: str
+            Output layer activation.
+
+        h_initializer, out_initializer: krs.initializers.Initializer
+            Keras initializers.
+
+        batch_norm: bool
+            Should batch norm be added?
+
+        Returns
+        -------
+        krs.Model
+            Model network.
+        """
+        self.net = DuelingNetModel(self.state_dim, self.action_dim, self.h_sizes, h_act, out_act, h_initializer,
+                              out_initializer, batch_norm, self.advantage_norm)
+
+    def state_action_value(self, s: np.ndarray, *args, **kwargs) -> tf.Tensor:
+        return self.net(s)
+
+    def advantage(self, s: np.ndarray, *args, **kwargs) -> tf.Tensor:
+        return self.net.advantage(s)

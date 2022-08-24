@@ -1,0 +1,4 @@
+,Contrast,A,B,Paired,Parametric,U-val,alternative,p-unc,hedges
+0,model,DuelingDDQN before,DuelingDDQN eval,False,False,0.0,two-sided,1.6055425323085578e-34,-26.14474786371825
+1,model,DuelingDDQN before,dummy,False,False,1479.0,two-sided,5.523921491011983e-18,-1.0699582552431521
+2,model,DuelingDDQN eval,dummy,False,False,10000.0,two-sided,2.4253959904747082e-34,14.879102003797646

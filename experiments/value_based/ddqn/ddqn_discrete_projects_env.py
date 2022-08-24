@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 
 import src.algorithms.advantages as adv
 import src.algorithms.dummy as dummy
-import src.algorithms.value_based.dqn as dqn
+import src.algorithms.value_based.ddqn as dqn
 import src.consts as consts
 import src.experiments.experiment_utils as exu
 import src.models.base_models.tf2.q_nets as qnets
@@ -16,13 +16,13 @@ import src.algorithms.memory_samplers as mbuff
 import src.utils as utils
 import src.envs.resource_allocation_env as rae
 
-EXPERIMENT_NAME = "DQN projects env"
+EXPERIMENT_NAME = "DDQN projects env"
 
 ENV_SIZE = 300
 
 if __name__ == "__main__":
     log = utils.prepare_default_log()
-    model_name_abbrev = f'dqn'
+    model_name_abbrev = f'ddqn'
     env = rae.DiscreteProjectsEnv(
         start_resource=100,
         start_cash=100,
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     buffer = mbuff.SimpleMemory(10000)
     dummy_agent = dummy.DummyAgent(env)
     optimization_agent = rae.DiscreteProjectOptimizerAgent(env)
-    agent = dqn.DQN(
+    agent = dqn.DDQN(
         target_net,
         action_net,
         buffer,
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     }
 
     scores, overall_result, pairwise_result = exu.conduct_experiment(agent, [dummy_agent, optimization_agent], env, EXPERIMENT_NAME,
-                                                                     'DQN basic', agent_learning_params,
+                                                                     'DDQN basic', agent_learning_params,
                                                                      agent_hyperparams, max_ep_steps=ENV_SIZE)
     log.info(scores.describe())
     log.info(overall_result)
