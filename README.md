@@ -53,11 +53,13 @@ Policy gradient algorithms:
 
 Hybrid algorithms:
 - [x] SAC
+- [ ] DDPG
+- [ ] TD3
 
 Value-based algorithms:
 - [x] DQN (vanilla)
-- [ ] DDQN
-- [ ] Dueling DQN
+- [x] DDQN
+- [x] Dueling DQN
 
 ## Pytorch implementations
 
