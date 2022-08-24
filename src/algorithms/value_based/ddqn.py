@@ -15,7 +15,7 @@ import src.algorithms.algo_utils as autils
 from src import consts
 
 
-class DQN(acommons.RLAgent):
+class DDQN(acommons.RLAgent):
     """
     Vanilla DQN implementation:
     Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A. A., Veness, J., Bellemare, M. G., ... & Hassabis, D. (2015). Human-level control through deep reinforcement learning. nature, 518(7540), 529-533.

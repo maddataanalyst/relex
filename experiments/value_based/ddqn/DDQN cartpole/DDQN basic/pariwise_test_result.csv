@@ -1,0 +1,4 @@
+,Contrast,A,B,Paired,Parametric,U-val,alternative,p-unc,hedges
+0,model,DQN before,DQN eval,False,False,0.0,two-sided,6.666523178417892e-35,-27.751844215977666
+1,model,DQN before,dummy,False,False,148.5,two-sided,5.356486260545391e-33,-1.725748592627763
+2,model,DQN eval,dummy,False,False,10000.0,two-sided,2.2473705420454622e-34,6.823492716945218

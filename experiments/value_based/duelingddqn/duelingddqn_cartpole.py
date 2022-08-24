@@ -1,4 +1,5 @@
 import gym
+import os
 import numpy as np
 import tensorflow.keras as krs
 from sklearn.preprocessing import StandardScaler
@@ -6,17 +7,17 @@ from tqdm.auto import tqdm
 
 import src.algorithms.dummy as dummy
 import src.algorithms.memory_samplers as mbuff
-import src.algorithms.value_based.dqn as dqn
+import src.algorithms.value_based.duelingddqn as duelingddqn
 import src.consts as consts
 import src.experiments.experiment_utils as exu
 import src.models.base_models.tf2.q_nets as qnets
 import src.utils as utils
 
-EXPERIMENT_NAME = "DQN cartpole"
+EXPERIMENT_NAME = "DuelingDDQN cartpole"
 
 if __name__ == "__main__":
     log = utils.prepare_default_log()
-    model_name_abbrev = f'dqn'
+    model_name_abbrev = f'DuelingDdqn'
     env = gym.make("CartPole-v1")
 
     s_dim = env.observation_space.shape[0]
@@ -28,13 +29,15 @@ if __name__ == "__main__":
     ep_max_steps = 200
 
     hidden_act = 'relu'
-    out_act = 'relu'
-    qnet_arch = [32, 16]
-    action_net = qnets.QNet(s_dim, a_dim, qnet_arch, h_initializer=hidden_initializer, h_act=hidden_act, out_act=out_act)
-    target_net = qnets.QNet(s_dim, a_dim, qnet_arch, h_initializer=hidden_initializer, h_act=hidden_act, out_act=out_act)
+    out_act = 'linear'
+    qnet_arch = [128, 128]
+    action_net = qnets.DuelingQNet(s_dim, a_dim, qnet_arch, h_initializer=hidden_initializer, h_act=hidden_act,
+                                   out_act=out_act, advantage_norm=qnets.AdvantageNorm.MEAN)
+    target_net = qnets.DuelingQNet(s_dim, a_dim, qnet_arch, h_initializer=hidden_initializer, h_act=hidden_act,
+                                   out_act=out_act, advantage_norm=qnets.AdvantageNorm.MEAN)
     buffer = mbuff.SimpleMemory(10000)
     dummy_agent = dummy.DummyAgent(env)
-    agent = dqn.DQN(
+    agent = duelingddqn.DuelingDDQN(
         target_net,
         action_net,
         buffer,
@@ -54,10 +57,10 @@ if __name__ == "__main__":
         consts.EP_MAX_STEPS: ep_max_steps
     }
     agent_learning_params = {
-        consts.NEPISODES: 200,
-        consts.PRINT_INTERVAL: 1,
+        consts.NEPISODES: 1000,
+        consts.PRINT_INTERVAL: 10,
         consts.BATCH_SIZE: 32,
-        'warmup_batches': 5
+        'warmup_batches': 10
     }
 
     samples = []
@@ -74,8 +77,9 @@ if __name__ == "__main__":
     ss.fit(np.array(samples))
 
     scores, overall_result, pairwise_result = exu.conduct_experiment(agent, [dummy_agent], env, EXPERIMENT_NAME,
-                                                                     'DQN basic', agent_learning_params,
-                                                                     agent_hyperparams, max_ep_steps=ep_max_steps, scaler=ss)
+                                                                     'DuelingDDQN mean avg', agent_learning_params,
+                                                                     agent_hyperparams, max_ep_steps=ep_max_steps,
+                                                                     scaler=ss)
     log.info(scores.describe())
     log.info(overall_result)
     log.info(pairwise_result)
