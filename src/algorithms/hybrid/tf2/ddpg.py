@@ -16,6 +16,7 @@ import src.algorithms.algo_utils as autils
 from src import consts
 
 
+
 class DDPG(acommons.RLAgent):
     """
     DDPG implementation. Paper:
@@ -29,20 +30,23 @@ class DDPG(acommons.RLAgent):
                  buffer: mbuff.SimpleMemory,
                  a_min: float,
                  a_max: float,
-                 net_optimizer: krs.optimizers.Optimizer = krs.optimizers.Adam(0.01),
+                 actor_optimizer: krs.optimizers.Optimizer = krs.optimizers.Adam(0.01),
+                 critic_optimizer: krs.optimizers.Optimizer = krs.optimizers.Adam(0.01),
                  loss_function: str = 'mean_squared_error',
                  action_clipper: rl_commons.ActionClipper = rl_commons.DefaultActionClipper(),
                  polyak_tau: float = 0.005,
-                 noise_std: float = 0.1,
+                 noise_gen: autils.NoiseGenerator = autils.OUActionNoise(mean=np.zeros(1), std_deviation=float(0.2) * np.ones(1)),
                  name: str = "DDPG",
-                 target_update_frequency: int = 5):
+                 target_update_frequency: int = 1):
         super().__init__(action_clipper, name)
+        self.noise_gen = noise_gen
         self.actor_net = actor_net
-        self.actor_net_target = actor_net_target
+        self.target_actor = actor_net_target
         self.critic_net = critic_net
-        self.critic_net_target = critic_net_target
+        self.target_critic = critic_net_target
 
-        self.net_optimizer = net_optimizer
+        self.actor_optimizer = actor_optimizer
+        self.critic_optimizer = critic_optimizer
         self.loss_function = loss_function
         self.a_min = a_min
         self.a_max = a_max
@@ -50,23 +54,18 @@ class DDPG(acommons.RLAgent):
         self.polyak_tau = polyak_tau
         self.target_update_frequency = target_update_frequency
 
-        self.noise_std = noise_std
+        self.noise_std = noise_gen
 
-        self.critic_net_target.net.set_weights(self.critic_net.net.get_weights())
-        self.actor_net_target.set_weights(self.actor_net.get_weights())
-
-        self.actor_net.compile(loss=self.loss_function, optimizer=self.net_optimizer)
-        self.actor_net_target.compile(loss=self.loss_function, optimizer=self.net_optimizer)
-
-        self.critic_net.net.compile(loss=self.loss_function, optimizer=self.net_optimizer)
-        self.critic_net_target.net.compile(loss=self.loss_function, optimizer=self.net_optimizer)
+        # self.target_critic.net.set_weights(self.critic_net.net.get_weights())
+        # self.target_actor.set_weights(self.actor_net.get_weights())
 
     def choose_action(self, s: np.array, *args, **kwargs) -> Tuple[np.array, np.array]:
         a, _ = self.actor_net.policy(np.atleast_2d(s))
         a = a.numpy()
-        a_noisy = a + np.random.normal(0.0, scale=self.noise_std, size=(1, self.actor_net.a_dim))
-        a_clip = np.clip(a_noisy, self.a_min, self.a_max)
-        return a_clip.squeeze(), None
+        noise = self.noise_gen.get_noise(a).squeeze()
+        self.noise_gen.update_noise_params()
+        a_noisy = np.clip(a + noise, self.a_min, self.a_max)
+        return a_noisy.squeeze(), None
 
     def train(self,
               env: gym.wrappers.TimeLimit,
@@ -112,7 +111,7 @@ class DDPG(acommons.RLAgent):
                 a, _, done, r, sprime = self.make_step(s, env, clip_action, scaler)
                 self.buffer.store_transition(s, a, r, sprime, None, None, None, done)
 
-                if self.buffer.actual_size >= warmup_size:
+                if self.buffer.actual_size >= warmup_size or done:
                     memory_sample = self.buffer.sample(batch_size, dim_state, dim_action, preserve_order=False)
                     batch_s, batch_a, \
                     batch_r, batch_done, \
@@ -128,9 +127,17 @@ class DDPG(acommons.RLAgent):
                 s = sprime
                 ep_score += r
 
-            if ep % self.target_update_frequency == 0:
-                qnets.polyak_tau_update_networks(self.actor_net_target, self.actor_net, self.polyak_tau)
-                qnets.polyak_tau_update_networks(self.critic_net_target.net, self.critic_net.net, self.polyak_tau)
+                if learning_step % self.target_update_frequency == 0:
+                    for target_w, new_w in zip(self.target_actor.trainable_weights,
+                                               self.actor_net.trainable_weights):
+                        target_w.assign((new_w * self.polyak_tau) + (1. - self.polyak_tau) * target_w)
+
+                    for target_w, new_w in zip(self.target_critic.net.trainable_weights,
+                                               self.critic_net.net.trainable_weights):
+                        target_w.assign((new_w * self.polyak_tau) + (1. - self.polyak_tau) * target_w)
+
+                # qnets.polyak_tau_update_networks(self.target_actor, self.actor_net, self.polyak_tau)
+                # qnets.polyak_tau_update_networks(self.target_critic.net, self.critic_net.net, self.polyak_tau)
 
             if ep % print_interval == 0:
                 autils.log_progress(max_train_sec, average_n_last, all_scores, t0, losses, ep, nepisodes, log,
@@ -153,25 +160,25 @@ class DDPG(acommons.RLAgent):
               gamma: float,
               learning_step: int,
               *args, **kwargs) -> float:
-        sprime_action, _ = self.actor_net_target.policy(sprime)
-        sprime_action = sprime_action.numpy()
-        sprime_target_q_vals = self.critic_net_target.state_action_value(sprime, sprime_action).numpy().squeeze()
+        sprime_action, _ = self.target_actor.policy(sprime)
+
+        sprime_target_q_vals = tf.squeeze(self.target_critic.state_action_value(sprime, sprime_action))
 
         # y = ri + gamma * Q-target(s', a') * (1-done)
-        targets_critic = r + (gamma * (sprime_target_q_vals * (1. - done)))
+        td_target = r + (gamma * (sprime_target_q_vals * (1. - done)))
 
         with tf.GradientTape() as tape:
             mse = krs.losses.MeanSquaredError()
-            s_qval = self.critic_net.state_action_value(s, a, training=True)
-            loss_critic = mse(targets_critic, s_qval)
+            s_qval = self.critic_net.net([s, a], training=True)
+            loss_critic = mse(td_target, s_qval)
         grad_critic = tape.gradient(loss_critic, self.critic_net.net.trainable_variables)
-        self.net_optimizer.apply_gradients(zip(grad_critic, self.critic_net.net.trainable_variables))
+        self.critic_optimizer.apply_gradients(zip(grad_critic, self.critic_net.net.trainable_variables))
 
         with tf.GradientTape() as tape:
-            new_actions, _ = self.actor_net.policy(s)
-            vs = self.critic_net.state_action_value(s, new_actions, training=True)
+            new_actions = self.actor_net(np.atleast_2d(s))
+            vs = self.critic_net.net([s, new_actions], training=True)
             loss_actor = -1 * tf.math.reduce_mean(vs)
         grad_actor = tape.gradient(loss_actor, self.actor_net.trainable_variables)
-        self.net_optimizer.apply_gradients(zip(grad_actor, self.actor_net.trainable_variables))
+        self.actor_optimizer.apply_gradients(zip(grad_actor, self.actor_net.trainable_variables))
 
         return 0.5 * (loss_critic + loss_actor)

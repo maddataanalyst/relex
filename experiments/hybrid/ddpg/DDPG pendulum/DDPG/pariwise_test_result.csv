@@ -1,4 +1,4 @@
 ,Contrast,A,B,Paired,Parametric,U-val,alternative,p-unc,hedges
-0,model,DDPG before,DDPG eval,False,False,6505.0,two-sided,0.00023684659469682797,0.5473469389290033
-1,model,DDPG before,dummy,False,False,5195.0,two-sided,0.6346165334378242,0.04543767624156607
-2,model,DDPG eval,dummy,False,False,3715.0,two-sided,0.001697958001439639,-0.5159502687868659
+0,model,DDPG before,DDPG eval,False,False,0.0,two-sided,2.562143669163401e-34,-4.538272076972154
+1,model,DDPG before,dummy,False,False,3844.0,two-sided,0.004752675508081529,-0.43027467555755716
+2,model,DDPG eval,dummy,False,False,10000.0,two-sided,2.562143669163401e-34,4.572608255382634
