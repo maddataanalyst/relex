@@ -38,7 +38,7 @@ class PPO(PolicyGradientBase):
 
     def __init__(
             self,
-            policy_net: policy_nets.BasePolicyNet,
+            policy_net: policy_nets.BaseStochasticPolicyNet,
             value_net: vnet.ValueNet,
             policy_opt: krs.optimizers.Optimizer,
             value_opt: krs.optimizers.Optimizer,

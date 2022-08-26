@@ -1,7 +1,6 @@
 import tensorflow as tf
 import numpy as np
-
-krs = tf.keras
+import tensorflow.keras as krs
 
 from enum import Enum
 from typing import List, Tuple
@@ -118,7 +117,7 @@ class QNet:
 
 class QSANet:
     """
-    Basic Q-net implementation, that takes s,a and outputs Q(s,a) value
+    Basic Q-net implementation, that takes s,a and outputs Q(s,a) value (single value).
     """
 
     def __init__(
@@ -203,6 +202,9 @@ class QSANet:
 
 
 class DuelingNetModel(krs.Model):
+    """Wrapper for Keras model, for building dueling networks - networks with two outputs:
+        1. First - V(s)
+        2. Second - Advantage"""
 
     def __init__(self, state_dim: int,
                  action_dim: int,
@@ -223,7 +225,7 @@ class DuelingNetModel(krs.Model):
         self.v_layer = krs.layers.Dense(units=1, activation=out_act, kernel_initializer=out_initializer)
         self.adv_layer = krs.layers.Dense(units=action_dim, activation=out_act, kernel_initializer=out_initializer)
 
-    def call(self, input_data):
+    def call(self, input_data) -> tf.Tensor:
         out1 = input_data
         if self.batch_norm:
             out1 = self.batch_norm_l(input_data)
@@ -240,7 +242,26 @@ class DuelingNetModel(krs.Model):
         q_sa = v_s + (adv_raw - adv_norm)
         return q_sa
 
-    def _normalize_advantage(self, adv_raw):
+    def _normalize_advantage(self, adv_raw: tf.Tensor) -> tf.Tensor:
+        """
+        Advantage normalization function. Two possible options are mentioned in literature - mean, and max
+        normalization.
+
+        Parameters
+        ----------
+        adv_raw: tf.Tensor
+            Raw advantage values
+
+        Returns
+        -------
+        tf.Tensor
+            Normalized advantage.
+
+        References
+        -------
+        Wang, Z., Schaul, T., Hessel, M., Hasselt, H., Lanctot, M., & Freitas, N. (2016, June). Dueling network architectures for deep reinforcement learning. In International conference on machine learning (pp. 1995-2003). PMLR.
+
+        """
         if self.advantage_norm == AdvantageNorm.MEAN:
             adv_norm = tf.math.reduce_mean(adv_raw, axis=1, keepdims=True)
 
@@ -248,7 +269,20 @@ class DuelingNetModel(krs.Model):
             adv_norm = tf.math.reduce_max(adv_raw, axis=1, keepdims=True)
         return adv_norm
 
-    def advantage(self, state: tf.Tensor):
+    def advantage(self, state: tf.Tensor) -> tf.Tensor:
+        """
+        Advantage calculation function: A(s,a) = Q(s,a) - V(s).
+
+        Parameters
+        ----------
+        state: tf.Tensor
+            Current state s(t)
+
+        Returns
+        -------
+        tf.Tensor
+            Advantage.
+        """
         out1 = state
         if self.batch_norm:
             out1 = self.batch_norm_l(state)
@@ -262,6 +296,8 @@ class DuelingNetModel(krs.Model):
 
 
 class DuelingQNet(QNet):
+
+    """Agent/training algorithm for dueling DQN."""
 
     def __init__(
             self,
@@ -278,7 +314,6 @@ class DuelingQNet(QNet):
         self.advantage_norm = advantage_norm
         self.action_dim = action_dim
         super().__init__(state_dim, action_dim, h_sizes, h_act, out_act, h_initializer, out_initializer, batch_norm)
-
 
     def _build_net(self, h_sizes: List[int], h_act: str, out_act: str, h_initializer: krs.initializers.Initializer,
                    out_initializer: krs.initializers.Initializer, batch_norm: bool = False) -> krs.Model:
@@ -308,7 +343,7 @@ class DuelingQNet(QNet):
             Model network.
         """
         self.net = DuelingNetModel(self.state_dim, self.action_dim, self.h_sizes, h_act, out_act, h_initializer,
-                              out_initializer, batch_norm, self.advantage_norm)
+                                   out_initializer, batch_norm, self.advantage_norm)
 
     def state_action_value(self, s: np.ndarray, *args, **kwargs) -> tf.Tensor:
         return self.net(s)

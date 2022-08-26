@@ -19,7 +19,7 @@ class PolicyGradientBase(rl_commons.RLAgent):
 
     def __init__(
             self,
-            policy_net: policy_nets.BasePolicyNet,
+            policy_net: policy_nets.BaseStochasticPolicyNet,
             value_net: vnets.ValueNet,
             advantage: adv.Advantage,
             action_clipper: ActionClipper = rl_commons.DefaultActionClipper(),

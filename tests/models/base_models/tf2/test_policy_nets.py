@@ -3,13 +3,25 @@ import gc
 
 import numpy as np
 import tensorflow as tf
-import tensorflow.keras as krs
-
+krs = tf.keras
 import src.models.base_models.tf2.policy_nets as policynet
 
 N = 3
 STATE_DIM = 3
 ACTION_DIM = 2
+
+
+def test_deterministic_policy_net():
+    # given
+    s = np.array([10., 20.])
+    initializer = krs.initializers.HeNormal(seed=123)
+    net = policynet.DeterministicPolicyNet(ACTION_DIM, [16, 16], hidden_initializer=initializer, out_initializer=initializer)
+    expected_pi = np.array([[2.7378902, 4.7575293]])
+    # when
+    pi, _ = net.policy(s)
+    pi = pi.numpy()
+    # then
+    np.testing.assert_almost_equal(expected_pi, pi, decimal=3)
 
 
 @pt.fixture(autouse=True)

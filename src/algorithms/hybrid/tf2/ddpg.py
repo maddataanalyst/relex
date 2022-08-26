@@ -9,57 +9,64 @@ import numpy as np
 
 import src.algorithms.commons as acommons
 import src.algorithms.commons as rl_commons
+import src.models.base_models.tf2.policy_nets as pi_net
 import src.models.base_models.tf2.q_nets as qnets
 import src.algorithms.memory_samplers as mbuff
 import src.algorithms.algo_utils as autils
 from src import consts
 
 
-class DDQN(acommons.RLAgent):
+class DDPG(acommons.RLAgent):
     """
-    Double Dueling Deep Q-network implementaion, related to paper:
-    Wang, Z., Schaul, T., Hessel, M., Hasselt, H., Lanctot, M., & Freitas, N. (2016, June). Dueling network architectures for deep reinforcement learning. In International conference on machine learning (pp. 1995-2003). PMLR.
-
+    DDPG implementation. Paper:
+    Silver, D., Lever, G., Heess, N., Degris, T., Wierstra, D., & Riedmiller, M. (2014, January). Deterministic policy gradient algorithms. In International conference on machine learning (pp. 387-395). PMLR.
     """
     def __init__(self,
-                 online_qnet: qnets.QNet,
-                 target_qnet: qnets.QNet,
+                 actor_net: pi_net.DeterministicPolicyNet,
+                 actor_net_target: pi_net.DeterministicPolicyNet,
+                 critic_net: qnets.QSANet,
+                 critic_net_target: qnets.QSANet,
                  buffer: mbuff.SimpleMemory,
-                 eps_start: float,
-                 eps_min: float,
-                 eps_decay_rate: float = 0.1,
+                 a_min: float,
+                 a_max: float,
                  net_optimizer: krs.optimizers.Optimizer = krs.optimizers.Adam(0.01),
                  loss_function: str = 'mean_squared_error',
                  action_clipper: rl_commons.ActionClipper = rl_commons.DefaultActionClipper(),
                  polyak_tau: float = 0.005,
-                 name: str = "DDQN",
+                 noise_std: float = 0.1,
+                 name: str = "DDPG",
                  target_update_frequency: int = 5):
         super().__init__(action_clipper, name)
-        self.online_qnet = online_qnet
+        self.actor_net = actor_net
+        self.actor_net_target = actor_net_target
+        self.critic_net = critic_net
+        self.critic_net_target = critic_net_target
+
         self.net_optimizer = net_optimizer
         self.loss_function = loss_function
-        self.target_qnet = target_qnet
-        self.eps_min = eps_min
-        self.eps_decay_rate = eps_decay_rate
-        self.eps_start = eps_start
+        self.a_min = a_min
+        self.a_max = a_max
         self.buffer = buffer
         self.polyak_tau = polyak_tau
         self.target_update_frequency = target_update_frequency
 
-        self.target_qnet.net.set_weights(self.online_qnet.net.get_weights())
+        self.noise_std = noise_std
 
-        self.online_qnet.net.compile(loss=self.loss_function, optimizer=self.net_optimizer)
-        self.target_qnet.net.compile(loss=self.loss_function, optimizer=self.net_optimizer)
+        self.critic_net_target.net.set_weights(self.critic_net.net.get_weights())
+        self.actor_net_target.set_weights(self.actor_net.get_weights())
+
+        self.actor_net.compile(loss=self.loss_function, optimizer=self.net_optimizer)
+        self.actor_net_target.compile(loss=self.loss_function, optimizer=self.net_optimizer)
+
+        self.critic_net.net.compile(loss=self.loss_function, optimizer=self.net_optimizer)
+        self.critic_net_target.net.compile(loss=self.loss_function, optimizer=self.net_optimizer)
 
     def choose_action(self, s: np.array, *args, **kwargs) -> Tuple[np.array, np.array]:
-        epsilon = kwargs.get(consts.EPSILON, 0.0)
-        p = np.random.rand()
-        if p < epsilon:
-            a = np.random.randint(self.online_qnet.action_dim)
-            return np.array(a), None
-        else:
-            prediction = self.online_qnet.state_action_value(np.atleast_2d(s)).numpy()
-            return prediction.argmax(axis=1).squeeze(), None
+        a, _ = self.actor_net.policy(np.atleast_2d(s))
+        a = a.numpy()
+        a_noisy = a + np.random.normal(0.0, scale=self.noise_std, size=(1, self.actor_net.a_dim))
+        a_clip = np.clip(a_noisy, self.a_min, self.a_max)
+        return a_clip.squeeze(), None
 
     def train(self,
               env: gym.wrappers.TimeLimit,
@@ -88,8 +95,6 @@ class DDQN(acommons.RLAgent):
             dim_state = env.observation_space.shape[0]
         dim_action = env.action_space.shape[0] if type(env.action_space) == gym.spaces.Box else 1
 
-        epsilon_decays = autils.decay_schedule_epsilon(self.eps_start, self.eps_min, self.eps_decay_rate, max_steps=nepisodes)
-
         for ep in range(nepisodes):
             s = autils.normalize_state(env.reset(), scaler)
             done = False
@@ -104,18 +109,17 @@ class DDQN(acommons.RLAgent):
                 if done:
                     break
 
-                epsilon = epsilon_decays[ep]
-                a, a_logprob, done, r, sprime = self.make_step(s, env, clip_action, scaler, epsilon=epsilon)
-                self.buffer.store_transition(s, a, r, sprime, None, None, a_logprob, done)
+                a, _, done, r, sprime = self.make_step(s, env, clip_action, scaler)
+                self.buffer.store_transition(s, a, r, sprime, None, None, None, done)
 
                 if self.buffer.actual_size >= warmup_size:
                     memory_sample = self.buffer.sample(batch_size, dim_state, dim_action, preserve_order=False)
                     batch_s, batch_a, \
                     batch_r, batch_done, \
                     batch_sprime, _, \
-                    _, batch_logprob = memory_sample
+                    _, _ = memory_sample
                     loss = self.learn(
-                        batch_s, batch_a, batch_logprob,
+                        batch_s, batch_a, None,
                         batch_r, batch_sprime, batch_done,
                         None, None, gamma, learning_step, batch_size=batch_size)
                     learning_step += 1
@@ -125,7 +129,8 @@ class DDQN(acommons.RLAgent):
                 ep_score += r
 
             if ep % self.target_update_frequency == 0:
-                qnets.polyak_tau_update_networks(self.target_qnet.net, self.online_qnet.net, self.polyak_tau)
+                qnets.polyak_tau_update_networks(self.actor_net_target, self.actor_net, self.polyak_tau)
+                qnets.polyak_tau_update_networks(self.critic_net_target.net, self.critic_net.net, self.polyak_tau)
 
             if ep % print_interval == 0:
                 autils.log_progress(max_train_sec, average_n_last, all_scores, t0, losses, ep, nepisodes, log,
@@ -148,17 +153,25 @@ class DDQN(acommons.RLAgent):
               gamma: float,
               learning_step: int,
               *args, **kwargs) -> float:
-        indices = np.arange(s.shape[0])
-        sprime_target_q_vals = self.target_qnet.state_action_value(sprime).numpy()
-        max_q_val = np.max(sprime_target_q_vals, axis=1)
+        sprime_action, _ = self.actor_net_target.policy(sprime)
+        sprime_action = sprime_action.numpy()
+        sprime_target_q_vals = self.critic_net_target.state_action_value(sprime, sprime_action).numpy().squeeze()
 
-        # y = ri + gamma * max a' Q-target(s', a')
-        targets = r + (gamma * (max_q_val * (1. - done)))
+        # y = ri + gamma * Q-target(s', a') * (1-done)
+        targets_critic = r + (gamma * (sprime_target_q_vals * (1. - done)))
 
-        # Loss = 1/N Q(s,a) - y
-        expected = self.online_qnet.state_action_value(s).numpy()
-        expected[indices, a.squeeze()] = targets
+        with tf.GradientTape() as tape:
+            mse = krs.losses.MeanSquaredError()
+            s_qval = self.critic_net.state_action_value(s, a, training=True)
+            loss_critic = mse(targets_critic, s_qval)
+        grad_critic = tape.gradient(loss_critic, self.critic_net.net.trainable_variables)
+        self.net_optimizer.apply_gradients(zip(grad_critic, self.critic_net.net.trainable_variables))
 
-        loss = self.online_qnet.net.train_on_batch(s, expected)
+        with tf.GradientTape() as tape:
+            new_actions, _ = self.actor_net.policy(s)
+            vs = self.critic_net.state_action_value(s, new_actions, training=True)
+            loss_actor = -1 * tf.math.reduce_mean(vs)
+        grad_actor = tape.gradient(loss_actor, self.actor_net.trainable_variables)
+        self.net_optimizer.apply_gradients(zip(grad_actor, self.actor_net.trainable_variables))
 
-        return loss
+        return 0.5 * (loss_critic + loss_actor)

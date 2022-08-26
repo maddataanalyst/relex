@@ -35,7 +35,7 @@ class ActorCrtic(PolicyGradientBase):
 
     def __init__(
             self,
-            actor: policy_nets.BasePolicyNet,
+            actor: policy_nets.BaseStochasticPolicyNet,
             critic: vnet.ValueNet,
             actor_opt: krs.optimizers.Optimizer,
             critic_opt: krs.optimizers.Optimizer,
