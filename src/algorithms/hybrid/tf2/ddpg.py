@@ -59,12 +59,29 @@ class DDPG(acommons.RLAgent):
         # self.target_critic.net.set_weights(self.critic_net.net.get_weights())
         # self.target_actor.set_weights(self.actor_net.get_weights())
 
-    def choose_action(self, s: np.array, *args, **kwargs) -> Tuple[np.array, np.array]:
+    def choose_action(self, s: np.array, deterministic: bool = False, *args, **kwargs) -> Tuple[np.array, np.array]:
+        """
+        A function for choosing an action using a policy net.
+        Parameters
+        ----------
+        s: np.array
+            Current state for which to choose an action.
+        deterministic: bool
+            Should action be deterministic or have injected noise?
+
+        Returns
+        -------
+        Tuple[np.array, np.array]
+            Tuple of action and log prob (always None in this case).
+        """
         a, _ = self.actor_net.policy(np.atleast_2d(s))
         a = a.numpy()
-        noise = self.noise_gen.get_noise(a).squeeze()
-        self.noise_gen.update_noise_params()
-        a_noisy = np.clip(a + noise, self.a_min, self.a_max)
+        if not deterministic:
+            noise = self.noise_gen.get_noise(a).squeeze()
+            self.noise_gen.update_noise_params()
+            a_noisy = np.clip(a + noise, self.a_min, self.a_max)
+        else:
+            a_noisy = a
         return a_noisy.squeeze(), None
 
     def train(self,
@@ -80,6 +97,41 @@ class DDPG(acommons.RLAgent):
               batch_size: int = 32,
               warmup_batches: int = 5,
               log: logging.Logger = logging.getLogger("dqn_logger"), *args, **kwargs) -> np.array:
+        """
+        A training function for DDPG algorithm.
+
+        Parameters
+        ----------
+        env: gym.wrappers.TimeLimit
+            Env to train on.
+        nepisodes: int
+            Number of episodes to train on.
+        gamma: float
+            Discount factor.
+        max_steps: int
+            Maximum number of steps per episode.
+        max_train_sec: int
+            Maximum training time.
+        print_interval: int
+            Logging interval.
+        average_n_last: int
+            Smoothing window of n scores when logging.
+        scaler: object
+            Any scaling object
+        clip_action: bool
+            Should action be clipped back to the original scale of env.
+        batch_size: int
+            Batch size for memory buffer.
+        warmup_batches: int
+            Number of batches treated as a 'warmup' for the algorithm.
+        log: logging.Logger
+            Logger
+
+        Returns
+        -------
+        np.array
+            Episode scores.
+        """
         all_scores = []
         t0 = time.time()
         losses = []
@@ -128,16 +180,8 @@ class DDPG(acommons.RLAgent):
                 ep_score += r
 
                 if learning_step % self.target_update_frequency == 0:
-                    for target_w, new_w in zip(self.target_actor.trainable_weights,
-                                               self.actor_net.trainable_weights):
-                        target_w.assign((new_w * self.polyak_tau) + (1. - self.polyak_tau) * target_w)
-
-                    for target_w, new_w in zip(self.target_critic.net.trainable_weights,
-                                               self.critic_net.net.trainable_weights):
-                        target_w.assign((new_w * self.polyak_tau) + (1. - self.polyak_tau) * target_w)
-
-                # qnets.polyak_tau_update_networks(self.target_actor, self.actor_net, self.polyak_tau)
-                # qnets.polyak_tau_update_networks(self.target_critic.net, self.critic_net.net, self.polyak_tau)
+                    qnets.polyak_tau_update_networks(self.target_actor, self.actor_net, self.polyak_tau)
+                    qnets.polyak_tau_update_networks(self.target_critic.net, self.critic_net.net, self.polyak_tau)
 
             if ep % print_interval == 0:
                 autils.log_progress(max_train_sec, average_n_last, all_scores, t0, losses, ep, nepisodes, log,
@@ -160,6 +204,37 @@ class DDPG(acommons.RLAgent):
               gamma: float,
               learning_step: int,
               *args, **kwargs) -> float:
+        """
+        Learning function - applied for a single batch of experiences.
+
+        Parameters
+        ----------
+        s: np.array
+            Current states.
+        a: np.array
+            Executed actions
+        a_logprob: np.array
+            Action log probs (always None for DDPG).
+        r: np.array
+            Rewards
+        sprime: np.array
+            Next states
+        done: np.array
+            Is episode done?
+        vs: np.array
+            V(st)
+        v_sprime: np.array
+            V(s t+1)
+        gamma: float
+            Discount factor
+        learning_step: int
+            Which learning iteration is this.
+
+        Returns
+        -------
+        float
+            Averaged actor and critic loss.
+        """
         sprime_action, _ = self.target_actor.policy(sprime)
 
         sprime_target_q_vals = tf.squeeze(self.target_critic.state_action_value(sprime, sprime_action))
@@ -167,18 +242,55 @@ class DDPG(acommons.RLAgent):
         # y = ri + gamma * Q-target(s', a') * (1-done)
         td_target = r + (gamma * (sprime_target_q_vals * (1. - done)))
 
-        with tf.GradientTape() as tape:
-            mse = krs.losses.MeanSquaredError()
-            s_qval = self.critic_net.net([s, a], training=True)
-            loss_critic = mse(td_target, s_qval)
-        grad_critic = tape.gradient(loss_critic, self.critic_net.net.trainable_variables)
-        self.critic_optimizer.apply_gradients(zip(grad_critic, self.critic_net.net.trainable_variables))
+        loss_critic = self.optimize_critic(a, s, td_target)
+        loss_actor = self.optimize_actor(s)
 
+        return 0.5 * (loss_critic + loss_actor)
+
+    def optimize_actor(self, s: np.array) -> float:
+        """
+        Helper function for optimizing actor network.
+
+        Parameters
+        ----------
+        s: np.array
+            Current states array.
+
+        Returns
+        -------
+        float
+            Actor loss
+        """
         with tf.GradientTape() as tape:
             new_actions = self.actor_net(np.atleast_2d(s))
             vs = self.critic_net.net([s, new_actions], training=True)
             loss_actor = -1 * tf.math.reduce_mean(vs)
         grad_actor = tape.gradient(loss_actor, self.actor_net.trainable_variables)
         self.actor_optimizer.apply_gradients(zip(grad_actor, self.actor_net.trainable_variables))
+        return loss_actor
 
-        return 0.5 * (loss_critic + loss_actor)
+    def optimize_critic(self, a: np.array, s: np.array, td_target: np.array) -> float:
+        """
+        Helper function for optimizing critic network.
+
+        Parameters
+        ----------
+        a: np.array
+            Executed actions.
+        s: np.array
+            Current states
+        td_target: np.array
+            TD-target gamma * r + V(s t+1) - V(s t)
+
+        Returns
+        -------
+        float
+            Critic loss.
+        """
+        with tf.GradientTape() as tape:
+            mse = krs.losses.MeanSquaredError()
+            s_qval = self.critic_net.net([s, a], training=True)
+            loss_critic = mse(td_target, s_qval)
+        grad_critic = tape.gradient(loss_critic, self.critic_net.net.trainable_variables)
+        self.critic_optimizer.apply_gradients(zip(grad_critic, self.critic_net.net.trainable_variables))
+        return loss_critic
