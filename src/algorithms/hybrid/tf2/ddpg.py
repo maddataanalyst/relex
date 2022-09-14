@@ -20,7 +20,7 @@ from src import consts
 class DDPG(acommons.RLAgent):
     """
     DDPG implementation. Paper:
-    Silver, D., Lever, G., Heess, N., Degris, T., Wierstra, D., & Riedmiller, M. (2014, January). Deterministic policy gradient algorithms. In International conference on machine learning (pp. 387-395). PMLR.
+    Lillicrap, T. P., Hunt, J. J., Pritzel, A., Heess, N., Erez, T., Tassa, Y., ... & Wierstra, D. (2015). Continuous control with deep reinforcement learning. arXiv preprint arXiv:1509.02971.
     """
     def __init__(self,
                  actor_net: pi_net.DeterministicPolicyNet,
@@ -180,8 +180,7 @@ class DDPG(acommons.RLAgent):
                 ep_score += r
 
                 if learning_step % self.target_update_frequency == 0:
-                    qnets.polyak_tau_update_networks(self.target_actor, self.actor_net, self.polyak_tau)
-                    qnets.polyak_tau_update_networks(self.target_critic.net, self.critic_net.net, self.polyak_tau)
+                    self.update_networks()
 
             if ep % print_interval == 0:
                 autils.log_progress(max_train_sec, average_n_last, all_scores, t0, losses, ep, nepisodes, log,
@@ -191,6 +190,10 @@ class DDPG(acommons.RLAgent):
                 break
             all_scores.append(ep_score)
         return np.array(all_scores)
+
+    def update_networks(self):
+        qnets.polyak_tau_update_networks(self.target_actor, self.actor_net, self.polyak_tau)
+        qnets.polyak_tau_update_networks(self.target_critic.net, self.critic_net.net, self.polyak_tau)
 
     def learn(self,
               s: np.array,

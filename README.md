@@ -20,19 +20,22 @@ For example, PPO implementation, or AC in theory, is embarrassingly parallel (mu
 
 ## Papers
 
-1. Value-based algorithms:
-   1. DQN: [Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A. A., Veness, J., Bellemare, M. G., ... & Hassabis, D. (2015). Human-level control through deep reinforcement learning. _nature_, _518_(7540), 529-533.](https://daiwk.github.io/assets/dqn.pdf)
-2. Policy gradient:
-   1. PPO
+1. **Value-based algorithms**:
+   1. **DQN**: [Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A. A., Veness, J., Bellemare, M. G., ... & Hassabis, D. (2015). Human-level control through deep reinforcement learning. _nature_, _518_(7540), 529-533.](https://daiwk.github.io/assets/dqn.pdf)
+2. **Policy** gradient:
+   1. **PPO**
       1. [Schulman, J., Wolski, F., Dhariwal, P., Radford, A., & Klimov, O. (2017). Proximal policy optimization algorithms. arXiv preprint arXiv:1707.06347.](https://arxiv.org/pdf/1707.06347.pdf)
       2. [Schulman, J., Moritz, P., Levine, S., Jordan, M., & Abbeel, P. (2015). High-dimensional continuous control using generalized advantage estimation. arXiv preprint arXiv:1506.02438.](https://arxiv.org/abs/1506.02438)
-   2. AC
+   2. **AC**
       1. [Mnih, V., Badia, A. P., Mirza, M., Graves, A., Lillicrap, T., Harley, T., ... & Kavukcuoglu, K. (2016, June). Asynchronous methods for deep reinforcement learning. In International conference on machine learning (pp. 1928-1937). PMLR.](https://arxiv.org/pdf/1602.01783.pdf)
       2. [Konda, V., & Tsitsiklis, J. (1999). Actor-critic algorithms. Advances in neural information processing systems, 12.](https://proceedings.neurips.cc/paper/1999/file/6449f44a102fde848669bdd9eb6b76fa-Paper.pdf)
-   3. VPG
+   3. **VPG**
       1. [Sutton, R. S., McAllester, D., Singh, S., & Mansour, Y. (1999). Policy gradient methods for reinforcement learning with function approximation. Advances in neural information processing systems, 12.](https://proceedings.neurips.cc/paper/1999/file/464d828b85b0bed98e80ade0a5c43b0f-Paper.pdf)
       2. [Abbeel, P. (2016). OPTIMIZING EXPECTATIONS: FROM DEEP REINFORCEMENT LEARNING TO STOCHASTIC COMPUTATION GRAPHS (Doctoral dissertation, University of California, Berkeley).](http://joschu.net/docs/thesis.pdf)
-   4. SAC
+3. **Hybrid algorithms**:
+   1. **DDPG**: [Lillicrap, T. P., Hunt, J. J., Pritzel, A., Heess, N., Erez, T., Tassa, Y., ... & Wierstra, D. (2015). Continuous control with deep reinforcement learning. arXiv preprint arXiv:1509.02971.](https://arxiv.org/abs/1509.02971)
+   2. **TD3**: [Fujimoto, S., Hoof, H., & Meger, D. (2018, July). Addressing function approximation error in actor-critic methods. In International conference on machine learning (pp. 1587-1596). PMLR.](https://arxiv.org/abs/1802.09477) 
+   3. **SAC**:
       1. [Haarnoja, T., Zhou, A., Abbeel, P., & Levine, S. (2018, July). Soft actor-critic: Off-policy maximum entropy deep reinforcement learning with a stochastic actor. In International conference on machine learning (pp. 1861-1870). PMLR.](https://arxiv.org/abs/1801.01290)
       2. [Haarnoja, T., Zhou, A., Hartikainen, K., Tucker, G., Ha, S., Tan, J., ... & Levine, S. (2018). Soft actor-critic algorithms and applications. arXiv preprint arXiv:1812.05905.](https://arxiv.org/abs/1812.05905)
 
@@ -53,8 +56,8 @@ Policy gradient algorithms:
 
 Hybrid algorithms:
 - [x] SAC
-- [ ] DDPG
-- [ ] TD3
+- [x] DDPG
+- [x] TD3
 
 Value-based algorithms:
 - [x] DQN (vanilla)
@@ -63,7 +66,7 @@ Value-based algorithms:
 
 ## Pytorch implementations
 
-TODO - top priority after DQN/DDQN/Dueling DQN
+TODO - top priority after DQN/DDQN/Dueling DQN and others.
 
 # Project structure
 
