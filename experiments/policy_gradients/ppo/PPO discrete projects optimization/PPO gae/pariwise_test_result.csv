@@ -1,7 +1,7 @@
 ,Contrast,A,B,Paired,Parametric,U-val,alternative,p-unc,hedges
-0,model,Optimization agent,agent before,False,False,9980.0,two-sided,3.4892176993680846e-34,5.680593615234197
-1,model,Optimization agent,agent eval,False,False,4389.0,two-sided,0.13578056955555826,-0.25356470828662336
-2,model,Optimization agent,dummy,False,False,9970.0,two-sided,5.750934331524841e-34,5.587699286854422
-3,model,agent before,agent eval,False,False,0.0,two-sided,1.9111226664258974e-34,-9.960086439025313
-4,model,agent before,dummy,False,False,3953.0,two-sided,0.009951722259638054,-0.42511726858115007
-5,model,agent eval,dummy,False,False,10000.0,two-sided,2.3388225514528836e-34,10.077467668165312
+0,model,Optimization agent,agent before,False,False,10000.0,two-sided,1.9581114639702377e-34,7.8389047547071335
+1,model,Optimization agent,agent eval,False,False,10000.0,two-sided,2.562143669163401e-34,6.651440969903534
+2,model,Optimization agent,dummy,False,False,10000.0,two-sided,2.4562335449061933e-34,7.491095959834422
+3,model,agent before,agent eval,False,False,606.0,two-sided,5.6606715661429084e-27,-1.9137526029805114
+4,model,agent before,dummy,False,False,2930.5,two-sided,3.7117586966422446e-07,-0.6071120188548285
+5,model,agent eval,dummy,False,False,8040.0,two-sided,1.0961428501285951e-13,1.318729955283388

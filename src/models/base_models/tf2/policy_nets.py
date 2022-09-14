@@ -7,6 +7,100 @@ from typing import List, Tuple
 
 
 class BasePolicyNet(krs.Model):
+    """Abstract base class for policy networks"""
+    def __init__(
+            self,
+            a_dim: int,
+            h_sizes: List[int],
+            h_act: str = 'relu',
+            out_act: str = 'linear',
+            hidden_initializer: krs.initializers.Initializer = krs.initializers.HeNormal(),
+            out_initializer: krs.initializers.Initializer = krs.initializers.HeNormal()):
+        super(BasePolicyNet, self).__init__()
+        self.a_dim = a_dim
+        self.h_sizes = h_sizes
+        self.h_act = h_act
+        self.out_act = out_act
+        self.hidden_initializer = hidden_initializer
+        self.out_initializer = out_initializer
+        self._build_network()
+
+
+    def _build_network(self):
+        self.dense_layers = []
+        for h_size in self.h_sizes:
+            self.dense_layers.append(krs.layers.Dense(h_size, self.h_act, kernel_initializer=self.hidden_initializer))
+        self.out_layer = krs.layers.Dense(self.a_dim, self.out_act, kernel_initializer=self.out_initializer)
+
+    def policy(self, s: np.array, training: bool = True, *args, **kwargs) -> Tuple[
+        tf.Tensor, tf.Tensor]:
+        """
+        Calculates a policy for a given state.
+
+        Parameters
+        ----------
+        s: np.array
+            Current state.
+        training: bool
+            Is this action calculated in a training mode?
+
+        Returns
+        -------
+        Tuple[tf.Tensor, tf.Tensor]
+            Tuple (a, None)
+            Action is an array of (1xAction dim).
+            Second argument is for compatibility with Stochastic Policy, where log prob is returned.
+        """
+        raise NotImplementedError("Implement me")
+
+
+class DeterministicPolicyNet(BasePolicyNet):
+    """Base class for deterministic policy implementations"""
+
+    def __init__(
+            self,
+            a_dim: int,
+            h_sizes: List[int],
+            a_max: int,
+            h_act: str = 'relu',
+            out_act: str = 'linear',
+            hidden_initializer: krs.initializers.Initializer = krs.initializers.HeNormal(),
+            out_initializer: krs.initializers.Initializer = krs.initializers.HeNormal()):
+        self.a_max = a_max
+        super(DeterministicPolicyNet, self).__init__(a_dim, h_sizes, h_act, out_act, hidden_initializer, out_initializer)
+
+    def call(self, input, *args, **kwargs):
+        hidden_out = input
+        for dense_l in self.dense_layers:
+            hidden_out = dense_l(hidden_out)
+        out = self.out_layer(hidden_out) * self.a_max
+        return out
+
+    def policy(self, s: np.array, training: bool = True, *args, **kwargs) -> Tuple[
+        tf.Tensor, tf.Tensor]:
+
+        """
+        Calculates a DETERMINISTIC policy for a given state.
+
+        Parameters
+        ----------
+        s: np.array
+            Current state.
+        training: bool
+            Is this action calculated in a training mode?
+
+        Returns
+        -------
+        Tuple[tf.Tensor, tf.Tensor]
+            Tuple (a, None)
+            Action is an array of (1xAction dim).
+            Second argument is for compatibility with Stochastic Policy, where log prob is returned.
+        """
+        action = self.call(np.atleast_2d(s))
+        return action, None
+
+
+class BaseStochasticPolicyNet(BasePolicyNet):
     """
     Base class for policy networks - forms an API and fundamental operations.
     """
@@ -19,7 +113,7 @@ class BasePolicyNet(krs.Model):
             out_act: str = 'linear',
             hidden_initializer: krs.initializers.Initializer = krs.initializers.HeNormal(),
             out_initializer: krs.initializers.Initializer = krs.initializers.HeNormal()):
-        super(BasePolicyNet, self).__init__()
+        super(BaseStochasticPolicyNet, self).__init__(a_dim, h_sizes, h_act, out_act, hidden_initializer, out_initializer)
         self.a_dim = a_dim
         self.h_sizes = h_sizes
         self.h_act = h_act
@@ -118,10 +212,10 @@ class BasePolicyNet(krs.Model):
 
     def build_graph(self):
         x = krs.layers.Input(shape=(self.dense_layers[0].input_dim))
-        return Model(inputs=[x], outputs=self.call(x))
+        return krs.models.Model(inputs=[x], outputs=self.call(x))
 
 
-class ContinuousPolicyNet(BasePolicyNet):
+class ContinuousPolicyNet(BaseStochasticPolicyNet):
     """
     Policy network for continuous action spaces. Instead of operating on the
     """
@@ -210,7 +304,7 @@ class ContinuousPolicyNetReparam(ContinuousPolicyNet):
         return reparam_logprob
 
 
-class DiscretePolicyNet(BasePolicyNet):
+class DiscretePolicyNet(BaseStochasticPolicyNet):
     """
     An implementation of a policy network for a continuous action spaces policy.
     """

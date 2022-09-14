@@ -17,8 +17,9 @@ from src import consts
 
 class DDQN(acommons.RLAgent):
     """
-    Vanilla DQN implementation:
-    Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A. A., Veness, J., Bellemare, M. G., ... & Hassabis, D. (2015). Human-level control through deep reinforcement learning. nature, 518(7540), 529-533.
+    Double Dueling Deep Q-network implementaion, related to paper:
+    Wang, Z., Schaul, T., Hessel, M., Hasselt, H., Lanctot, M., & Freitas, N. (2016, June). Dueling network architectures for deep reinforcement learning. In International conference on machine learning (pp. 1995-2003). PMLR.
+
     """
     def __init__(self,
                  online_qnet: qnets.QNet,
@@ -31,7 +32,7 @@ class DDQN(acommons.RLAgent):
                  loss_function: str = 'mean_squared_error',
                  action_clipper: rl_commons.ActionClipper = rl_commons.DefaultActionClipper(),
                  polyak_tau: float = 0.005,
-                 name: str = "DQN",
+                 name: str = "DDQN",
                  target_update_frequency: int = 5):
         super().__init__(action_clipper, name)
         self.online_qnet = online_qnet

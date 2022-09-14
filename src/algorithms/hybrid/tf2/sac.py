@@ -25,7 +25,7 @@ class SAC(rl_commons.RLAgent):
     """
 
     def __init__(self,
-                 actor: policy_nets.BasePolicyNet,
+                 actor: policy_nets.BaseStochasticPolicyNet,
                  critic1: q_nets.QSANet,
                  critic2: q_nets.QSANet,
                  target_critic1: q_nets.QSANet,

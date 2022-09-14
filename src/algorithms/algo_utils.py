@@ -2,7 +2,7 @@ import logging
 import sys
 import time
 import mlflow
-from typing import List
+from typing import List, Callable
 
 import gym
 import numpy as np
@@ -14,6 +14,63 @@ import src.algorithms.commons as rl_commons
 NANS_EPISLON = "NaNs in epsilons check params"
 
 TOO_FEW_EPISODES_MSG = "Cannot allocate decayed espilons. Try to increase number of episodes or increase decay rate"
+
+
+class NoiseGenerator:
+
+    def get_noise(self, x: np.ndarray) -> np.float:
+        raise NotImplementedError()
+
+    def update_noise_params(self):
+        pass
+
+
+class SimpleNoiseGenerator(NoiseGenerator):
+
+    def __init__(self, mu: float, std: float, rho: float = 0.15, dt: float = 1e-1, dim: int = 1):
+        self.mu = mu
+        self.std = std
+        self.rho = rho
+        self.dt = dt
+        self.dim = dim
+
+    def get_noise(self, x: np.ndarray) -> np.float:
+        return (
+                x + self.rho * (self.mu - x) * self.dt + self.std * np.sqrt(self.dt) * np.random.normal(size=self.dim)
+        )
+
+
+class OUActionNoise(NoiseGenerator):
+    """
+    This implementation has been copied from the Keras documentation site: https://github.com/keras-team/keras-io/blob/master/examples/rl/ddpg_pendulum.py
+    https://github.com/keras-team/keras-io/blob/master/examples/rl/ddpg_pendulum.py
+    """
+    def __init__(self, mean, std_deviation, theta=0.15, dt=1e-2, x_initial=None):
+        self.theta = theta
+        self.mean = mean
+        self.std_dev = std_deviation
+        self.dt = dt
+        self.x_initial = x_initial
+        self.reset()
+
+    def get_noise(self, x: np.ndarray):
+        # Formula taken from https://www.wikipedia.org/wiki/Ornstein-Uhlenbeck_process.
+        x_noise = (
+            self.x_prev
+            + self.theta * (self.mean - self.x_prev) * self.dt
+            + self.std_dev * np.sqrt(self.dt) * np.random.normal(size=self.mean.shape)
+        )
+        # Store x into x_prev
+        # Makes next noise dependent on current one
+        self.x_prev = x_noise
+        return x_noise
+
+    def reset(self):
+        if self.x_initial is not None:
+            self.x_prev = self.x_initial
+        else:
+            self.x_prev = np.zeros_like(self.mean)
+
 
 
 def normalize_state(s: np.ndarray, scaler: object = None) -> np.array:
@@ -96,7 +153,7 @@ def log_progress(
 
 
 def evaluate_algorithm(model: rl_commons.RLAgent, env: gym.Env, n_episodes: int, max_ep_steps: int = 1000,
-                       clip_action: bool = True, scaler: object = None, last_reward_only: bool = False) -> np.array:
+                       clip_action: bool = True, scaler: object = None, last_reward_only: bool = False, scores_summary_operator: Callable = np.sum) -> np.array:
     """
     Evaluates an agent against an environment and collects scores along the way.
 
@@ -124,6 +181,9 @@ def evaluate_algorithm(model: rl_commons.RLAgent, env: gym.Env, n_episodes: int,
         Should only last reward in episode be returned? Useful in env when the final reward is some sort of summary
         e.g. profit & loss.
 
+    scores_summary_operator: Callable
+        A function to be called to summarize episode.
+
     Returns
     -------
     np.array
@@ -133,7 +193,7 @@ def evaluate_algorithm(model: rl_commons.RLAgent, env: gym.Env, n_episodes: int,
     for _ in tqdm(range(n_episodes)):
         done = False
         step = 0
-        ep_score = 0.
+        ep_scores = []
         s = env.reset()
         while not done:
             if step > max_ep_steps:
@@ -142,12 +202,13 @@ def evaluate_algorithm(model: rl_commons.RLAgent, env: gym.Env, n_episodes: int,
             a, a_logprob = model.choose_action(s)
             a_clip = np.clip(a, env.action_space.low, env.action_space.high) if clip_action else a
             sprime, r, done, _ = env.step(np.atleast_1d(a_clip)) if env.action_space.shape != () else env.step(a_clip)
-            ep_score += r
+            ep_scores.append(r)
             s = sprime
         if last_reward_only:
             scores.append(r)
         else:
-            scores.append(ep_score)
+            ep_summary = scores_summary_operator(ep_scores)
+            scores.append(ep_summary)
     return np.array(scores)
 
 
