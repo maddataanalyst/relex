@@ -37,6 +37,10 @@ class TD3(ddpg.DDPG):
         self.critic_net2 = critic_net2
         self.target_critic2 = critic_net2_target
 
+    def update_networks(self):
+        super().update_networks()
+        qnets.polyak_tau_update_networks(self.target_critic2.net, self.critic_net2.net, self.polyak_tau)
+
     def learn(self,
               s: np.array,
               a: np.array,
