@@ -27,9 +27,18 @@ if __name__ == "__main__":
     mean_out_actf = 'linear'
     policy_arch = [64, 64]
     h_initializer = krs.initializers.GlorotUniform()
-    out_initializer = krs.initializers.RandomUniform(minval=-0.003, maxval=0.003)
-    policy_net = pinets.ContinuousPolicyNetReparam(s_dim, a_dim, policy_arch, policy_act_f, mean_out_act=mean_out_actf,
-                                                out_initializer=out_initializer, hidden_initializer=h_initializer)
+    out_initializer = krs.initializers.RandomUniform(minval=-0.01, maxval=0.01)
+    policy_net = pinets.ContinuousPolicyNetReparam(
+        s_dim,
+        a_dim,
+        policy_arch,
+        policy_act_f,
+        mean_out_act=mean_out_actf,
+        out_initializer=out_initializer,
+        hidden_initializer=h_initializer,
+        estimate_log_std_in_output=True,
+        std_min=1e-9,
+        std_max=3.)
 
     critic_arch_shared = [32, 32]
     critic_arch_a_sizes = [32]
